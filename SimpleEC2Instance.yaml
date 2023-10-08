@@ -4,14 +4,14 @@ Parameters:
 Mappings:
   RegionsMap:
     eu-central-1:
-      ARM68: ami-04a3fea0ceec717e5
-      x68: ami-067d1e60475437da2
+      ARM68: ami-0f677abdb602a68a2
+      x68: ami-0c42696027a8ede58
     ap-south-1:
       ARM68: ami-04a3fea0ceec717e5
-      x68: ami-067d1e60475437da2
+      x68: ami-0c42696027a8ede58
     eu-west-1:
-      ARM68: ami-0a445ece583184891
-      x68: ami-0bb4c991fa89d4b9b
+      ARM68: ami-061fa6e1836162a87
+      x68: ami-03d294e37a4820c21
   InstanceType:
     eu-central-1:
       Type: t3.micro
