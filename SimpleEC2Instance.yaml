@@ -1,0 +1,42 @@
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+Mappings:
+  RegionsMap:
+    eu-central-1:
+      ARM68: ami-04a3fea0ceec717e5
+      x68: ami-067d1e60475437da2
+    ap-south-1:
+      ARM68: ami-04a3fea0ceec717e5
+      x68: ami-067d1e60475437da2
+    eu-west-1:
+      ARM68: ami-0a445ece583184891
+      x68: ami-0bb4c991fa89d4b9b
+  InstanceType:
+    eu-central-1:
+      Type: t3.micro
+    ap-south-1:
+      Type: t2.micro
+    eu-west-1:
+     Type: t3.small
+
+Resources:
+  LogicalID:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      BlockDeviceMappings: 
+        - DeviceName: /dev/xvda
+          Ebs:
+               VolumeSize: 8
+               VolumeType: gp3
+               Iops: 3000
+               DeleteOnTermination: true
+               Encrypted: false
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [RegionsMap, !Ref "AWS::Region", x68]
+      InstanceType: !FindInMap [InstanceType, !Ref "AWS::Region", Type]
+      Tags: 
+        -
+          Key: Name
+          Value: 'my-instance'
