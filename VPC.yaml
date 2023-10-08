@@ -1,0 +1,96 @@
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 123.0.0.0/16
+      EnableDnsHostnames: false
+      EnableDnsSupport: false
+      Tags:
+        - Key: Name
+          Value: cf-vpc
+    
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: VPC IG
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+   Type: AWS::EC2::Subnet
+   Properties:
+    CidrBlock: 123.0.1.0/24
+    VpcId: !Ref VPC
+    MapPublicIpOnLaunch: true
+    AvailabilityZone: !Select [0, !GetAZs '']
+        
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 123.0.2.0/24
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [1, !GetAZs '']
+  
+  PublicSubnet2:
+   Type: AWS::EC2::Subnet
+   Properties:
+    CidrBlock: 123.0.3.0/24
+    VpcId: !Ref VPC
+    MapPublicIpOnLaunch: true
+    AvailabilityZone: !Select [0, !GetAZs '']
+        
+  PrivateSubnet2:
+   Type: AWS::EC2::Subnet
+   Properties:
+    CidrBlock: 123.0.4.0/24
+    VpcId: !Ref VPC
+    MapPublicIpOnLaunch: false
+    AvailabilityZone: !Select [1, !GetAZs '']
+        
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Piblic RouteTable for VPC
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref RouteTable
+  PublicRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref RouteTable
+  
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Private Routetable
+  PrivateTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
