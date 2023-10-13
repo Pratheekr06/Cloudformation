@@ -179,3 +179,9 @@ Resources:
           InstancePort: '80'
           Protocol: HTTP
           InstanceProtocol: HTTP
+      HealthCheck:
+        Target: HTTP:80/
+        HealthyThreshold: '3'
+        UnhealthyThreshold: '5'
+        Interval: '30'
+        Timeout: '5'
