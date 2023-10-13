@@ -1,0 +1,181 @@
+Parameters:
+  KeyName:
+    Type: String
+Resources:
+  ELBVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 155.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: My-ALB-VPC
+  
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: My-ALB-VPC-IG
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref ELBVPC
+      InternetGatewayId: !Ref InternetGateway
+  
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 155.0.1.0/24
+      VpcId: !Ref ELBVPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+  
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 155.0.2.0/24
+      VpcId: !Ref ELBVPC
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [0, !GetAZs '']
+  
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 155.0.3.0/24
+      VpcId: !Ref ELBVPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs '']
+  
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 155.0.4.0/24
+      VpcId: !Ref ELBVPC
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [1, !GetAZs '']
+  
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ELBVPC
+      Tags:
+        - Key: Name
+          Value: My-ALB-VPC-PUBLIC-RT
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref PublicRouteTable
+      GatewayId: !Ref InternetGateway
+  PublicRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  PublicRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+      
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ELBVPC
+      Tags:
+        - Key: Name
+          Value:  My-ALB-VPC-PRIVATE-RT
+  PrivateRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  MyELBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Secuirty group for ALB
+      GroupName: CF-ALB-SG
+      VpcId: !Ref ELBVPC
+      SecurityGroupIngress: 
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+  MyALBEC2SG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for my ALB EC2 Targets
+      GroupName: CF-ALB-EC2-SG
+      VpcId: !Ref ELBVPC
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref MyELBSG
+          IpProtocol: tcp
+          ToPort: 80
+          FromPort: 80
+  
+  MYASGTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: ami-0c42696027a8ede58
+        InstanceType: t2.micro
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 8
+              VolumeType: gp3
+              Iops: 3000
+              Throughput: 120
+              DeleteOnTermination: true
+              Encrypted: false
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+             - !Ref MyALBEC2SG
+      LaunchTemplateName: My-ALB-SG-Template
+    
+  MYALBSG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: MY-ALB-ASG
+      CapacityRebalance: false
+      DesiredCapacity: "2"
+      HealthCheckGracePeriod: 30
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MYASGTemplate
+        Version: !GetAtt MYASGTemplate.LatestVersionNumber
+      LoadBalancerNames: 
+        - !Ref MYALB
+      MaxSize: "4" # Required
+      MinSize: "2" # Required
+      NewInstancesProtectedFromScaleIn: false
+      VPCZoneIdentifier: 
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  MYALB:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref MyELBSG
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Listeners:
+        - LoadBalancerPort: '80'
+          InstancePort: '80'
+          Protocol: HTTP
+          InstanceProtocol: HTTP
