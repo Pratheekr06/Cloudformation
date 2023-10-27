@@ -1,0 +1,92 @@
+Parameters:
+  S3BucketName:
+    Type: String
+  LambdaCodeBucketName:
+    Type: String
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DependsOn:
+      - LambdaFunctionPermission
+    Properties:
+      BucketName: !Ref S3BucketName
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+        IgnorePublicAcls: true
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt LambdaFunction.Arn
+            Filter:
+             S3Key:
+              Rules:
+              - Name: suffix
+                Value: jpeg
+
+  LambdaFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaFunction.Arn
+      SourceArn: !Sub "arn:aws:s3:::${S3BucketName}"
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      RoleName: cf-lambda-role
+      Policies:
+        - PolicyName: allowLogging
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: !Sub "arn:aws:logs:${AWS::Region}"
+        - PolicyName: getS3
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "s3:GetObject"
+                Resource: !Sub "arn:aws:s3:::${S3BucketName}/*"
+        - PolicyName: dynamodb
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:ListTables"
+                  - "dynamodb:PutItem"
+                  - "dynamodb:CreateTable"
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}"
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: cf-lambda-function
+      Handler: index.handler
+      Role: !GetAtt LambdaFunctionRole.Arn
+      Runtime: python3.11
+      Code:
+       S3Bucket: !Ref LambdaCodeBucketName
+       S3Key: s3_lambda_dynamodb.zip
